@@ -94,6 +94,7 @@ func newServeCommand() *cli.Command {
 			case <-ctx.Done():
 			case err := <-errCh:
 				if err != nil {
+					srv.Stop()
 					return fmt.Errorf("server failed to start: %w", err)
 				}
 			}
