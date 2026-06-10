@@ -4,32 +4,18 @@ import (
 	"testing"
 	"time"
 
+	"go.lumeweb.com/ipfs-dht-health-monitor/pkg/internal/testutil"
 	"go.lumeweb.com/ipfs-dht-health-monitor/pkg/check"
 
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 )
 
-func newTestMetrics(t *testing.T) *Metrics {
+func newTestMetrics(t *testing.T) *MetricsDefault {
 	t.Helper()
 	m := NewMetrics()
-	t.Cleanup(func() {
-		prometheus.Unregister(m.DNSLinkResolutionSuccess)
-		prometheus.Unregister(m.ProvidersFoundTotal)
-		prometheus.Unregister(m.ProvidersWithAddressesTotal)
-		prometheus.Unregister(m.BitswapSuccess)
-		prometheus.Unregister(m.BitswapDuration)
-		prometheus.Unregister(m.BitswapProvidersResponded)
-		prometheus.Unregister(m.BitswapProvidersWithData)
-		prometheus.Unregister(m.HTTPRetrievalSuccess)
-		prometheus.Unregister(m.HTTPRetrievalDuration)
-		prometheus.Unregister(m.BackendUp)
-		prometheus.Unregister(m.BackendResponseDuration)
-		prometheus.Unregister(m.ScrapesTotal)
-		prometheus.Unregister(m.ScrapeErrorsTotal)
-		prometheus.Unregister(m.LastScrapeTimestamp)
-	})
-	return m
+	testutil.NewTestMetrics(t, m)
+	return m.(*MetricsDefault)
 }
 
 func readGauge(gv *prometheus.GaugeVec, labels ...string) float64 {
@@ -73,30 +59,30 @@ func TestUpdateFromCheckResponse_Success(t *testing.T) {
 		},
 	}
 
-	UpdateFromCheckResponse(m, "example.com", "backend1", resp, 1*time.Second)
+	m.UpdateFromCheckResponse("example.com", "backend1", resp, 1*time.Second)
 
-	if v := readGauge(m.DNSLinkResolutionSuccess, "example.com", "backend1"); v != 1 {
+	if v := readGauge(m.g(MetricDNSLinkResolutionSuccess), "example.com", "backend1"); v != 1 {
 		t.Errorf("dnslink_resolution_success = %v, want 1", v)
 	}
-	if v := readGauge(m.BackendUp, "backend1"); v != 1 {
+	if v := readGauge(m.g(MetricBackendUp), "backend1"); v != 1 {
 		t.Errorf("backend_up = %v, want 1", v)
 	}
-	if v := readGauge(m.ProvidersFoundTotal, "example.com", "backend1", check.SourceDHT); v != 1 {
+	if v := readGauge(m.g(MetricProvidersFoundTotal), "example.com", "backend1", check.SourceDHT); v != 1 {
 		t.Errorf("providers_found_total = %v, want 1", v)
 	}
-	if v := readGauge(m.ProvidersWithAddressesTotal, "example.com", "backend1"); v != 1 {
+	if v := readGauge(m.g(MetricProvidersWithAddressesTotal), "example.com", "backend1"); v != 1 {
 		t.Errorf("providers_with_addresses_total = %v, want 1", v)
 	}
-	if v := readGauge(m.BitswapSuccess, "example.com", "backend1"); v != 1 {
+	if v := readGauge(m.g(MetricBitswapSuccess), "example.com", "backend1"); v != 1 {
 		t.Errorf("bitswap_success = %v, want 1", v)
 	}
-	if v := readGauge(m.HTTPRetrievalSuccess, "example.com", "backend1"); v != 1 {
+	if v := readGauge(m.g(MetricHTTPRetrievalSuccess), "example.com", "backend1"); v != 1 {
 		t.Errorf("http_retrieval_success = %v, want 1", v)
 	}
-	if v := readGauge(m.BitswapProvidersResponded, "example.com", "backend1"); v != 1 {
+	if v := readGauge(m.g(MetricBitswapProvidersResponded), "example.com", "backend1"); v != 1 {
 		t.Errorf("bitswap_providers_responded = %v, want 1", v)
 	}
-	if v := readGauge(m.BitswapProvidersWithData, "example.com", "backend1"); v != 1 {
+	if v := readGauge(m.g(MetricBitswapProvidersWithData), "example.com", "backend1"); v != 1 {
 		t.Errorf("bitswap_providers_with_data = %v, want 1", v)
 	}
 }
@@ -111,9 +97,9 @@ func TestUpdateFromCheckResponse_DNSLinkFailure(t *testing.T) {
 		},
 	}
 
-	UpdateFromCheckResponse(m, "example.com", "backend1", resp, 1*time.Second)
+	m.UpdateFromCheckResponse("example.com", "backend1", resp, 1*time.Second)
 
-	if v := readGauge(m.DNSLinkResolutionSuccess, "example.com", "backend1"); v != 0 {
+	if v := readGauge(m.g(MetricDNSLinkResolutionSuccess), "example.com", "backend1"); v != 0 {
 		t.Errorf("dnslink_resolution_success = %v, want 0", v)
 	}
 }
@@ -145,23 +131,23 @@ func TestZeroDomainMetrics(t *testing.T) {
 			},
 		},
 	}
-	UpdateFromCheckResponse(m, "example.com", "backend1", resp, 1*time.Second)
+	m.UpdateFromCheckResponse("example.com", "backend1", resp, 1*time.Second)
 
-	ZeroDomainMetrics(m, "example.com", "backend1")
+	m.ZeroDomainMetrics("example.com", "backend1")
 
-	if v := readGauge(m.DNSLinkResolutionSuccess, "example.com", "backend1"); v != 0 {
+	if v := readGauge(m.g(MetricDNSLinkResolutionSuccess), "example.com", "backend1"); v != 0 {
 		t.Errorf("dnslink_resolution_success after zero = %v, want 0", v)
 	}
-	if v := readGauge(m.BitswapSuccess, "example.com", "backend1"); v != 0 {
+	if v := readGauge(m.g(MetricBitswapSuccess), "example.com", "backend1"); v != 0 {
 		t.Errorf("bitswap_success after zero = %v, want 0", v)
 	}
-	if v := readGauge(m.HTTPRetrievalSuccess, "example.com", "backend1"); v != 0 {
+	if v := readGauge(m.g(MetricHTTPRetrievalSuccess), "example.com", "backend1"); v != 0 {
 		t.Errorf("http_retrieval_success after zero = %v, want 0", v)
 	}
-	if v := readGauge(m.BitswapDuration, "example.com", "backend1"); v != 0 {
+	if v := readGauge(m.g(MetricBitswapDurationSeconds), "example.com", "backend1"); v != 0 {
 		t.Errorf("bitswap_duration after zero = %v, want 0", v)
 	}
-	if v := readGauge(m.HTTPRetrievalDuration, "example.com", "backend1"); v != 0 {
+	if v := readGauge(m.g(MetricHTTPRetrievalDurationSeconds), "example.com", "backend1"); v != 0 {
 		t.Errorf("http_retrieval_duration after zero = %v, want 0", v)
 	}
 }
@@ -169,15 +155,62 @@ func TestZeroDomainMetrics(t *testing.T) {
 func TestSetBackendDown(t *testing.T) {
 	m := newTestMetrics(t)
 
-	m.BackendUp.WithLabelValues("backend1").Set(1)
-	m.BackendResponseDuration.WithLabelValues("backend1").Set(1.5)
+	m.g(MetricBackendUp).WithLabelValues("backend1").Set(1)
+	m.g(MetricBackendResponseDurationSeconds).WithLabelValues("backend1").Set(1.5)
 
-	SetBackendDown(m, "backend1")
+	m.SetBackendDown("backend1")
 
-	if v := readGauge(m.BackendUp, "backend1"); v != 0 {
+	if v := readGauge(m.g(MetricBackendUp), "backend1"); v != 0 {
 		t.Errorf("backend_up after SetBackendDown = %v, want 0", v)
 	}
-	if v := readGauge(m.BackendResponseDuration, "backend1"); v != 0 {
+	if v := readGauge(m.g(MetricBackendResponseDurationSeconds), "backend1"); v != 0 {
 		t.Errorf("backend_response_duration after SetBackendDown = %v, want 0", v)
+	}
+}
+
+func TestUpdateFromCheckResponse_EmptyProviders(t *testing.T) {
+	m := newTestMetrics(t)
+
+	m.g(MetricProvidersFoundTotal).WithLabelValues("example.com", "backend1", check.SourceDHT).Set(5)
+	m.g(MetricProvidersWithAddressesTotal).WithLabelValues("example.com", "backend1").Set(3)
+	m.g(MetricBitswapSuccess).WithLabelValues("example.com", "backend1").Set(1)
+
+	resp := &check.CheckResponse{
+		MutableResolution: &check.MutableResolution{
+			InputPath:    "/ipns/example.com",
+			ResolvedPath: "/ipfs/QmExample",
+		},
+		Providers: nil,
+	}
+
+	m.UpdateFromCheckResponse("example.com", "backend1", resp, 1*time.Second)
+
+	if v := readGauge(m.g(MetricDNSLinkResolutionSuccess), "example.com", "backend1"); v != 1 {
+		t.Errorf("dnslink_resolution_success = %v, want 1 (DNSLink still succeeds with empty providers)", v)
+	}
+	if v := readGauge(m.g(MetricProvidersFoundTotal), "example.com", "backend1", check.SourceDHT); v != 0 {
+		t.Errorf("providers_found_total = %v, want 0 (should be zeroed)", v)
+	}
+	if v := readGauge(m.g(MetricProvidersWithAddressesTotal), "example.com", "backend1"); v != 0 {
+		t.Errorf("providers_with_addresses_total = %v, want 0", v)
+	}
+	if v := readGauge(m.g(MetricBitswapSuccess), "example.com", "backend1"); v != 0 {
+		t.Errorf("bitswap_success = %v, want 0", v)
+	}
+}
+
+func TestZeroDomainMetrics_ProvidersFoundTotal(t *testing.T) {
+	m := newTestMetrics(t)
+
+	m.g(MetricProvidersFoundTotal).WithLabelValues("example.com", "backend1", check.SourceDHT).Set(5)
+	m.g(MetricProvidersFoundTotal).WithLabelValues("example.com", "backend1", check.SourceIPNI).Set(3)
+
+	m.ZeroDomainMetrics("example.com", "backend1")
+
+	if v := readGauge(m.g(MetricProvidersFoundTotal), "example.com", "backend1", check.SourceDHT); v != 0 {
+		t.Errorf("providers_found_total DHT after zero = %v, want 0", v)
+	}
+	if v := readGauge(m.g(MetricProvidersFoundTotal), "example.com", "backend1", check.SourceIPNI); v != 0 {
+		t.Errorf("providers_found_total IPNI after zero = %v, want 0", v)
 	}
 }

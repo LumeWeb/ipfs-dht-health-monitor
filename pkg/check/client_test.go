@@ -53,7 +53,7 @@ func TestClient_Check_Success(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client := NewClient([]string{srv.URL})
+	client := NewClient([]string{srv.URL}, 30*time.Second)
 	got, err := client.Check(t.Context(), srv.URL, "example.com", 10*time.Second)
 	if err != nil {
 		t.Fatalf("Check() error: %v", err)
@@ -88,7 +88,7 @@ func TestClient_Check_Error(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client := NewClient([]string{srv.URL})
+	client := NewClient([]string{srv.URL}, 30*time.Second)
 	_, err := client.Check(t.Context(), srv.URL, "example.com", 10*time.Second)
 	if err == nil {
 		t.Fatal("Check() expected error, got nil")
@@ -104,7 +104,7 @@ func TestClient_Check_Timeout(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client := NewClient([]string{srv.URL})
+	client := NewClient([]string{srv.URL}, 30*time.Second)
 	ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
 	defer cancel()
 

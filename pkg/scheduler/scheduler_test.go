@@ -8,45 +8,18 @@ import (
 	"testing"
 	"time"
 
+	"go.lumeweb.com/ipfs-dht-health-monitor/pkg/internal/testutil"
 	"go.lumeweb.com/ipfs-dht-health-monitor/pkg/check"
 	"go.lumeweb.com/ipfs-dht-health-monitor/pkg/metrics"
 
 	"github.com/prometheus/client_golang/prometheus"
-	dto "github.com/prometheus/client_model/go"
 )
 
-func newTestMetricsForScheduler(t *testing.T) *metrics.Metrics {
+func newTestMetricsForScheduler(t *testing.T) metrics.Metrics {
 	t.Helper()
 	m := metrics.NewMetrics()
-	t.Cleanup(func() {
-		prometheus.Unregister(m.DNSLinkResolutionSuccess)
-		prometheus.Unregister(m.ProvidersFoundTotal)
-		prometheus.Unregister(m.ProvidersWithAddressesTotal)
-		prometheus.Unregister(m.BitswapSuccess)
-		prometheus.Unregister(m.BitswapDuration)
-		prometheus.Unregister(m.BitswapProvidersResponded)
-		prometheus.Unregister(m.BitswapProvidersWithData)
-		prometheus.Unregister(m.HTTPRetrievalSuccess)
-		prometheus.Unregister(m.HTTPRetrievalDuration)
-		prometheus.Unregister(m.BackendUp)
-		prometheus.Unregister(m.BackendResponseDuration)
-		prometheus.Unregister(m.ScrapesTotal)
-		prometheus.Unregister(m.ScrapeErrorsTotal)
-		prometheus.Unregister(m.LastScrapeTimestamp)
-	})
+	testutil.NewTestMetrics(t, m)
 	return m
-}
-
-func readGaugeValue(gv *prometheus.GaugeVec, labels ...string) float64 {
-	metric, err := gv.GetMetricWithLabelValues(labels...)
-	if err != nil {
-		return -1
-	}
-	var m dto.Metric
-	if err := metric.Write(&m); err != nil {
-		return -1
-	}
-	return m.GetGauge().GetValue()
 }
 
 func TestScheduler_RunCheckCycle(t *testing.T) {
@@ -82,7 +55,7 @@ func TestScheduler_RunCheckCycle(t *testing.T) {
 	defer srv.Close()
 
 	m := newTestMetricsForScheduler(t)
-	client := check.NewClient([]string{srv.URL})
+	client := check.NewClient([]string{srv.URL}, 10*time.Second)
 	s := NewScheduler(client, m, []string{"example.com"}, []string{srv.URL}, 10*time.Second, 10*time.Second)
 
 	ctx := t.Context()
@@ -91,13 +64,13 @@ func TestScheduler_RunCheckCycle(t *testing.T) {
 	time.Sleep(500 * time.Millisecond)
 	s.Stop()
 
-	if v := readGaugeValue(m.BackendUp, srv.URL); v != 1 {
+	if v := m.ReadGauge(metrics.MetricBackendUp, prometheus.Labels{"backend": srv.URL}); v != 1 {
 		t.Errorf("backend_up = %v, want 1", v)
 	}
-	if v := readGaugeValue(m.DNSLinkResolutionSuccess, "example.com", srv.URL); v != 1 {
+	if v := m.ReadGauge(metrics.MetricDNSLinkResolutionSuccess, prometheus.Labels{"domain": "example.com", "backend": srv.URL}); v != 1 {
 		t.Errorf("dnslink_resolution_success = %v, want 1", v)
 	}
-	if v := readGaugeValue(m.BitswapSuccess, "example.com", srv.URL); v != 1 {
+	if v := m.ReadGauge(metrics.MetricBitswapSuccess, prometheus.Labels{"domain": "example.com", "backend": srv.URL}); v != 1 {
 		t.Errorf("bitswap_success = %v, want 1", v)
 	}
 }
@@ -110,7 +83,7 @@ func TestScheduler_SkipOverlapping(t *testing.T) {
 	defer srv.Close()
 
 	m := newTestMetricsForScheduler(t)
-	client := check.NewClient([]string{srv.URL})
+	client := check.NewClient([]string{srv.URL}, 10*time.Second)
 	s := NewScheduler(client, m, []string{"example.com"}, []string{srv.URL}, 100*time.Millisecond, 10*time.Second)
 
 	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
@@ -122,7 +95,7 @@ func TestScheduler_SkipOverlapping(t *testing.T) {
 
 	s.Stop()
 
-	if v := readGaugeValue(m.BackendUp, srv.URL); v != 0 {
+	if v := m.ReadGauge(metrics.MetricBackendUp, prometheus.Labels{"backend": srv.URL}); v != 0 {
 		t.Errorf("backend_up after overlapping ticks = %v, want 0 (500ms responses, 100ms interval means errors)", v)
 	}
 }

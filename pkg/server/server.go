@@ -15,11 +15,11 @@ import (
 
 type Server struct {
 	httpServer *http.Server
-	metrics    *metrics.Metrics
-	scheduler  *scheduler.Scheduler
+	metrics    metrics.Metrics
+	scheduler  scheduler.Scheduler
 }
 
-func NewServer(addr string, m *metrics.Metrics, s *scheduler.Scheduler) *Server {
+func NewServer(addr string, m metrics.Metrics, s scheduler.Scheduler) *Server {
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
 

@@ -72,7 +72,7 @@ func newServeCommand() *cli.Command {
 				return err
 			}
 
-			client := check.NewClient(cfg.Backends)
+			client := check.NewClient(cfg.Backends, cfg.Timeout)
 			m := metrics.NewMetrics()
 			sched := scheduler.NewScheduler(client, m, cfg.Domains, cfg.Backends, cfg.Interval, cfg.Timeout)
 			srv := server.NewServer(cfg.ListenAddr(), m, sched)

@@ -15,23 +15,30 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-type Client struct {
+type Checker interface {
+	Check(ctx context.Context, backend string, domain string, timeout time.Duration) (*CheckResponse, error)
+	CheckAll(ctx context.Context, domain string, timeout time.Duration) map[string]*CheckResult
+}
+
+type CheckClient struct {
 	httpClient *http.Client
 	backends   []string
 	userAgent  string
 }
 
-func NewClient(backends []string) *Client {
-	return &Client{
+var _ Checker = (*CheckClient)(nil)
+
+func NewClient(backends []string, timeout time.Duration) *CheckClient {
+	return &CheckClient{
 		httpClient: &http.Client{
-			Timeout: 60 * time.Second,
+			Timeout: timeout,
 		},
 		backends:  backends,
 		userAgent: fmt.Sprintf("ipfs-dht-health-monitor/%s", build.Version),
 	}
 }
 
-func (c *Client) Check(ctx context.Context, backend string, domain string, timeout time.Duration) (*CheckResponse, error) {
+func (c *CheckClient) Check(ctx context.Context, backend string, domain string, timeout time.Duration) (*CheckResponse, error) {
 	checkURL := fmt.Sprintf("%s/check?cid=%s&timeoutSeconds=%d", backend, url.QueryEscape(domain), int(timeout.Seconds()))
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, checkURL, nil)
@@ -98,24 +105,31 @@ func (c *Client) Check(ctx context.Context, backend string, domain string, timeo
 	return &result, nil
 }
 
-func (c *Client) CheckAll(ctx context.Context, domain string, timeout time.Duration) map[string]*CheckResponse {
+type CheckResult struct {
+	Response *CheckResponse
+	Duration time.Duration
+}
+
+func (c *CheckClient) CheckAll(ctx context.Context, domain string, timeout time.Duration) map[string]*CheckResult {
 	type result struct {
 		backend string
-		resp    *CheckResponse
+		res     *CheckResult
 	}
-	results := make(map[string]*CheckResponse, len(c.backends))
+	results := make(map[string]*CheckResult, len(c.backends))
 	ch := make(chan result, len(c.backends))
 
 	var eg errgroup.Group
 	for _, backend := range c.backends {
 		b := backend
 		eg.Go(func() error {
+			start := time.Now()
 			resp, err := c.Check(ctx, b, domain, timeout)
+			duration := time.Since(start)
 			if err != nil {
-				ch <- result{backend: b, resp: nil}
+				ch <- result{backend: b, res: &CheckResult{Response: nil, Duration: duration}}
 				return nil
 			}
-			ch <- result{backend: b, resp: resp}
+			ch <- result{backend: b, res: &CheckResult{Response: resp, Duration: duration}}
 			return nil
 		})
 	}
@@ -126,7 +140,7 @@ func (c *Client) CheckAll(ctx context.Context, domain string, timeout time.Durat
 	}()
 
 	for r := range ch {
-		results[r.backend] = r.resp
+		results[r.backend] = r.res
 	}
 
 	return results

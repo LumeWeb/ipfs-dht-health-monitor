@@ -27,7 +27,7 @@ pkg/scheduler/                  Check orchestration
   └── scheduler.go              Ticker loop, domain×backend matrix, overlap protection
 pkg/metrics/                    Prometheus metrics
   ├── metrics.go                All metric definitions (namespace: ipfs_check)
-  └── updater.go                UpdateFromCheckResponse / ZeroDomainMetrics / SetBackendDown
+  └── updater.go                UpdateFromCheckResponse / zeroProviderMetrics / ZeroDomainMetrics / SetBackendDown
 pkg/server/                     HTTP server
   └── server.go                 /metrics endpoint via promhttp
 pkg/logger/                     Global logger
@@ -38,8 +38,9 @@ pkg/logger/                     Global logger
 
 1. `main.go` → `cli.Run()` → `serve` command
 2. `serve` creates: `check.Client` → `metrics.Metrics` → `scheduler.Scheduler` → `server.Server`
-3. Scheduler ticks every `--interval`, calls `client.CheckAll()` per domain
-4. Each (domain, backend) pair → `metrics.UpdateFromCheckResponse()` or `metrics.SetBackendDown()` on error
+3. Scheduler ticks every `--interval`, calls `client.CheckAll()` per domain (parallel across backends via errgroup)
+4. Each (domain, backend) pair → `metrics.UpdateFromCheckResponse()` on success; `metrics.ZeroDomainMetrics()` + `metrics.SetBackendDown()` on error
+5. BackendUp gauge set once per backend after all domains processed (not per-check)
 5. Server exposes `/metrics` for Prometheus scraping
 
 ### Key Concurrency Patterns
@@ -164,5 +165,5 @@ Multi-stage `Dockerfile`:
 
 - **Prometheus registration panics**: `MustRegister` panics if a collector is already registered. Tests must unregister in `t.Cleanup()`. Adding a new metric requires updating all test helper cleanup lists.
 - **Scheduler skip-on-overlap**: If a check cycle takes longer than `--interval`, the next tick is silently skipped (not queued). This is intentional to prevent unbounded goroutine growth.
-- **Client timeout vs request timeout**: `Client.httpClient.Timeout` is 60s (hardcoded). The `--timeout` flag sets `timeoutSeconds` query parameter sent to the ipfs-check backend. These are independent — the HTTP client can time out before the backend does.
+- **Client timeout**: `Client.httpClient.Timeout` is set from the `--timeout` flag via `NewClient(backends, timeout)`. This same value is sent as `timeoutSeconds` query parameter to the ipfs-check backend. Both client-side and server-side timeouts use the same configured duration.
 - **No build tags, no CGO**: Pure Go. `CGO_ENABLED=0` in Dockerfile.

@@ -11,9 +11,14 @@ import (
 	"go.uber.org/zap"
 )
 
-type Scheduler struct {
-	client   *check.Client
-	metrics  *metrics.Metrics
+type Scheduler interface {
+	Start(ctx context.Context)
+	Stop()
+}
+
+type SchedulerDefault struct {
+	client   check.Checker
+	metrics  metrics.Metrics
 	domains  []string
 	backends []string
 	interval time.Duration
@@ -24,19 +29,21 @@ type Scheduler struct {
 	done    chan struct{}
 }
 
-func NewScheduler(client *check.Client, m *metrics.Metrics, domains, backends []string, interval, timeout time.Duration) *Scheduler {
-	return &Scheduler{
+var _ Scheduler = (*SchedulerDefault)(nil)
+
+func NewScheduler(client check.Checker, m metrics.Metrics, domains, backends []string, interval, timeout time.Duration) *SchedulerDefault {
+	return &SchedulerDefault{
 		client:   client,
 		metrics:  m,
 		domains:  domains,
 		backends: backends,
 		interval: interval,
 		timeout:  timeout,
-		done:      make(chan struct{}),
+		done:     make(chan struct{}),
 	}
 }
 
-func (s *Scheduler) Start(ctx context.Context) {
+func (s *SchedulerDefault) Start(ctx context.Context) {
 	ctx, s.cancel = context.WithCancel(ctx)
 
 	go func() {
@@ -62,7 +69,7 @@ func (s *Scheduler) Start(ctx context.Context) {
 	}()
 }
 
-func (s *Scheduler) Stop() {
+func (s *SchedulerDefault) Stop() {
 	if s.cancel == nil {
 		return
 	}
@@ -75,30 +82,35 @@ func (s *Scheduler) Stop() {
 	}
 }
 
-func (s *Scheduler) runCheckCycle(ctx context.Context) {
+func (s *SchedulerDefault) runCheckCycle(ctx context.Context) {
 	s.running.Store(true)
 	defer s.running.Store(false)
 
-	for _, domain := range s.domains {
-		for _, backend := range s.backends {
-			start := time.Now()
-			resp, err := s.client.Check(ctx, backend, domain, s.timeout)
-			duration := time.Since(start)
+	backendReachable := make(map[string]bool, len(s.backends))
 
-			if err != nil {
+	for _, domain := range s.domains {
+		results := s.client.CheckAll(ctx, domain, s.timeout)
+		for backend, res := range results {
+			if res.Response == nil {
 				zap.L().Error("check failed",
 					zap.String("domain", domain),
 					zap.String("backend", backend),
-					zap.Duration("duration", duration),
-					zap.Error(err),
+					zap.Duration("duration", res.Duration),
 				)
-				metrics.SetBackendDown(s.metrics, backend)
-				metrics.ZeroDomainMetrics(s.metrics, domain, backend)
-				s.metrics.ScrapeErrorsTotal.WithLabelValues(domain, backend).Inc()
+				s.metrics.ZeroDomainMetrics(domain, backend)
+				s.metrics.IncScrapeError(domain, backend)
 				continue
 			}
+			backendReachable[backend] = true
+			s.metrics.UpdateFromCheckResponse(domain, backend, res.Response, res.Duration)
+		}
+	}
 
-			metrics.UpdateFromCheckResponse(s.metrics, domain, backend, resp, duration)
+	for _, backend := range s.backends {
+		if backendReachable[backend] {
+			s.metrics.SetBackendUp(backend)
+		} else {
+			s.metrics.SetBackendDown(backend)
 		}
 	}
 }

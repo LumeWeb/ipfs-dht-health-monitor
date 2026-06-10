@@ -10,32 +10,16 @@ import (
 	"testing"
 	"time"
 
+	"go.lumeweb.com/ipfs-dht-health-monitor/pkg/internal/testutil"
 	"go.lumeweb.com/ipfs-dht-health-monitor/pkg/check"
 	"go.lumeweb.com/ipfs-dht-health-monitor/pkg/metrics"
 	"go.lumeweb.com/ipfs-dht-health-monitor/pkg/scheduler"
-
-	"github.com/prometheus/client_golang/prometheus"
 )
 
-func newTestMetricsForServer(t *testing.T) *metrics.Metrics {
+func newTestMetricsForServer(t *testing.T) metrics.Metrics {
 	t.Helper()
 	m := metrics.NewMetrics()
-	t.Cleanup(func() {
-		prometheus.Unregister(m.DNSLinkResolutionSuccess)
-		prometheus.Unregister(m.ProvidersFoundTotal)
-		prometheus.Unregister(m.ProvidersWithAddressesTotal)
-		prometheus.Unregister(m.BitswapSuccess)
-		prometheus.Unregister(m.BitswapDuration)
-		prometheus.Unregister(m.BitswapProvidersResponded)
-		prometheus.Unregister(m.BitswapProvidersWithData)
-		prometheus.Unregister(m.HTTPRetrievalSuccess)
-		prometheus.Unregister(m.HTTPRetrievalDuration)
-		prometheus.Unregister(m.BackendUp)
-		prometheus.Unregister(m.BackendResponseDuration)
-		prometheus.Unregister(m.ScrapesTotal)
-		prometheus.Unregister(m.ScrapeErrorsTotal)
-		prometheus.Unregister(m.LastScrapeTimestamp)
-	})
+	testutil.NewTestMetrics(t, m)
 	return m
 }
 
@@ -72,7 +56,7 @@ func TestServer_MetricsEndpoint(t *testing.T) {
 	defer backendSrv.Close()
 
 	m := newTestMetricsForServer(t)
-	client := check.NewClient([]string{backendSrv.URL})
+	client := check.NewClient([]string{backendSrv.URL}, 10*time.Second)
 	sched := scheduler.NewScheduler(client, m, []string{"example.com"}, []string{backendSrv.URL}, 10*time.Second, 10*time.Second)
 
 	srv := NewServer("127.0.0.1:0", m, sched)
