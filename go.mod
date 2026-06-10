@@ -1,4 +1,4 @@
-module go.lumeweb.com/ipfs-dht-health-monitor
+module go.lumeweb.com/ipfs-dht-health-monitor // v0.0.0
 
 go 1.26.0
 
