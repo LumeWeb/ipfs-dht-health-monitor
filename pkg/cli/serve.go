@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"fmt"
 	"os/signal"
 	"syscall"
 	"time"
@@ -80,13 +81,22 @@ func newServeCommand() *cli.Command {
 			ctx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 			defer stop()
 
+			errCh := make(chan error, 1)
 			go func() {
 				if err := srv.Start(); err != nil {
-					zap.L().Error("server error", zap.Error(err))
+					errCh <- err
+					return
 				}
+				errCh <- nil
 			}()
 
-			<-ctx.Done()
+			select {
+			case <-ctx.Done():
+			case err := <-errCh:
+				if err != nil {
+					return fmt.Errorf("server failed to start: %w", err)
+				}
+			}
 			zap.L().Info("shutting down")
 			srv.Stop()
 

@@ -118,6 +118,8 @@ func (m *MetricsDefault) UpdateFromCheckResponse(domain, backend string, resp *c
 		} else {
 			m.g(MetricDNSLinkResolutionSuccess).WithLabelValues(domain, backend).Set(0)
 		}
+	} else {
+		m.g(MetricDNSLinkResolutionSuccess).WithLabelValues(domain, backend).Set(0)
 	}
 
 	if len(resp.Providers) == 0 {
@@ -185,6 +187,7 @@ func (m *MetricsDefault) UpdateFromCheckResponse(domain, backend string, resp *c
 }
 
 func (m *MetricsDefault) zeroProviderMetrics(domain, backend string) {
+	m.g(MetricProvidersFoundTotal).DeletePartialMatch(prometheus.Labels{"domain": domain, "backend": backend})
 	for _, source := range []string{check.SourceDHT, check.SourceIPNI} {
 		m.g(MetricProvidersFoundTotal).WithLabelValues(domain, backend, source).Set(0)
 	}
