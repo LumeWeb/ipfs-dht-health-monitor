@@ -17,8 +17,7 @@ Prometheus exporter that monitors DNSLink domain health via ipfs-check API backe
 cmd/ipfs-dht-health-monitor/   Entry point (main.go)
 build/                          Version info (ldflags-injected at build time)
 pkg/cli/                        CLI framework (urfave/cli/v3)
-  ├── root.go                   Root command definition
-  ├── serve.go                  "serve" subcommand + flag definitions
+  ├── root.go                   Root command, flag definitions, and action
   └── config.go                 CLI flag → Config struct, validation
 pkg/check/                      ipfs-check API client
   ├── client.go                 HTTP client, Check/CheckAll methods
@@ -36,8 +35,8 @@ pkg/logger/                     Global logger
 
 ### Data Flow
 
-1. `main.go` → `cli.Run()` → `serve` command
-2. `serve` creates: `check.Client` → `metrics.Metrics` → `scheduler.Scheduler` → `server.Server`
+1. `main.go` → `cli.Run()` → root command action
+2. Root command creates: `check.Client` → `metrics.Metrics` → `scheduler.Scheduler` → `server.Server`
 3. Scheduler ticks every `--interval`, calls `client.CheckAll()` per domain (parallel across backends via errgroup)
 4. Each (domain, backend) pair → `metrics.UpdateFromCheckResponse()` on success; `metrics.ZeroDomainMetrics()` + `metrics.SetBackendDown()` on error
 5. BackendUp gauge set once per backend after all domains processed (not per-check)
@@ -61,11 +60,11 @@ go build -ldflags="-s -w \
   ./cmd/ipfs-dht-health-monitor
 
 # Run
-./bin/ipfs-dht-health-monitor serve --domains=example.com
+./bin/ipfs-dht-health-monitor --domains=example.com
 
 # Docker
 docker build -t ipfs-dht-health-monitor .
-docker run -p 9797:9797 ipfs-dht-health-monitor serve --domains=example.com
+docker run -p 9797:9797 ipfs-dht-health-monitor --domains=example.com
 ```
 
 ## Tests
