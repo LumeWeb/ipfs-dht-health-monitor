@@ -1,8 +1,6 @@
 # Build stage
 FROM golang:1.26-alpine AS builder
 
-RUN apk add --no-cache git
-
 WORKDIR /build
 
 # Copy dependency files first for layer caching
@@ -12,15 +10,15 @@ RUN go mod download
 # Copy source code
 COPY . .
 
-# Extract version info from git and build
+# Build with version info passed via build args
 ARG VERSION=dev
-RUN COMMIT="$(git rev-parse HEAD)" \
-    DATE="$(git log -1 --format=%cd --date=iso-strict)" \
-    && CGO_ENABLED=0 go build \
+ARG COMMIT=unknown
+ARG BUILD_TIME=unknown
+RUN CGO_ENABLED=0 go build \
     -ldflags="-s -w \
     -X go.lumeweb.com/ipfs-dht-health-monitor/build.Version=${VERSION} \
     -X go.lumeweb.com/ipfs-dht-health-monitor/build.GitCommit=${COMMIT} \
-    -X go.lumeweb.com/ipfs-dht-health-monitor/build.BuildTime=${DATE}" \
+    -X go.lumeweb.com/ipfs-dht-health-monitor/build.BuildTime=${BUILD_TIME}" \
     -o ipfs-dht-health-monitor \
     ./cmd/ipfs-dht-health-monitor
 
