@@ -15,10 +15,10 @@ Prometheus exporter that monitors DNSLink domain health via ipfs-check API backe
 ```bash
 # Docker
 docker run -p 9797:9797 ghcr.io/lumeweb/ipfs-dht-health-monitor \
-  serve --domains=example.com,another.com
+  --domains=example.com,another.com
 
 # Binary
-ipfs-dht-health-monitor serve --domains=example.com
+ipfs-dht-health-monitor --domains=example.com
 ```
 
 ## Configuration
@@ -64,8 +64,7 @@ docker run -d \
   -p 9797:9797 \
   -e IPFS_CHECK_DOMAINS=example.com,another.com \
   -e IPFS_CHECK_INTERVAL=60s \
-  ghcr.io/lumeweb/ipfs-dht-health-monitor \
-  serve
+  ghcr.io/lumeweb/ipfs-dht-health-monitor
 ```
 
 ### Coolify
