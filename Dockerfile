@@ -23,7 +23,9 @@ RUN CGO_ENABLED=0 go build \
     ./cmd/ipfs-dht-health-monitor
 
 # Runtime stage
-FROM scratch
+FROM alpine:3.22
+
+RUN apk add --no-cache ca-certificates
 
 # Copy the binary from builder
 COPY --from=builder /build/ipfs-dht-health-monitor /ipfs-dht-health-monitor
