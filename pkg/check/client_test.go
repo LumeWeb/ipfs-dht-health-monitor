@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -122,5 +123,80 @@ func TestClient_Check_Timeout(t *testing.T) {
 	// The error should be context.DeadlineExceeded or wrapped around it.
 	if ctx.Err() != context.DeadlineExceeded {
 		t.Errorf("context error = %v, want DeadlineExceeded", ctx.Err())
+	}
+}
+
+func TestClient_Check_RetryOnEmptyProviders(t *testing.T) {
+	t.Parallel()
+
+	var callCount atomic.Int32
+	validResp := validCheckResponse()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n := callCount.Add(1)
+		if n == 1 {
+			// First call: return empty providers (retryable)
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(CheckResponse{
+				MutableResolution: &MutableResolution{
+					InputPath:    "/ipns/example.com",
+					ResolvedPath: "/ipfs/QmExample",
+				},
+				Providers: []ProviderOutput{},
+			})
+			return
+		}
+		// Second call: return valid response with providers
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(validResp)
+	}))
+	defer srv.Close()
+
+	client := NewClient([]string{srv.URL}, 30*time.Second, "https://cid.contact")
+	got, err := client.Check(t.Context(), srv.URL, "example.com", 10*time.Second)
+	if err != nil {
+		t.Fatalf("Check() error: %v", err)
+	}
+	if calls := callCount.Load(); calls != 2 {
+		t.Errorf("expected 2 attempts, got %d", calls)
+	}
+	if len(got.Providers) != 1 {
+		t.Fatalf("len(Providers) = %d, want 1", len(got.Providers))
+	}
+}
+
+func TestClient_Check_RetryExhausted(t *testing.T) {
+	t.Parallel()
+
+	var callCount atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		callCount.Add(1)
+		// Always return empty providers (retryable, but retries exhausted)
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(CheckResponse{
+			MutableResolution: &MutableResolution{
+				InputPath:    "/ipns/example.com",
+				ResolvedPath: "/ipfs/QmExample",
+			},
+			Providers: []ProviderOutput{},
+		})
+	}))
+	defer srv.Close()
+
+	client := NewClient([]string{srv.URL}, 30*time.Second, "https://cid.contact")
+	got, err := client.Check(t.Context(), srv.URL, "example.com", 10*time.Second)
+	// After retries exhausted on a valid 200 with no providers, the response
+	// should still be returned (not an error) so metrics reflect the real
+	// state instead of marking the backend as down.
+	if err != nil {
+		t.Fatalf("Check() unexpected error after retries exhausted: %v", err)
+	}
+	if calls := callCount.Load(); calls != 2 {
+		t.Errorf("expected 2 attempts (1 retry), got %d", calls)
+	}
+	if got == nil {
+		t.Fatal("Check() returned nil response after retries exhausted")
+	}
+	if len(got.Providers) != 0 {
+		t.Errorf("len(Providers) = %d, want 0", len(got.Providers))
 	}
 }
