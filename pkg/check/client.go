@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/avast/retry-go/v5"
 	"go.lumeweb.com/ipfs-dht-health-monitor/build"
 
 	"go.uber.org/zap"
@@ -41,6 +42,17 @@ func NewClient(backends []string, timeout time.Duration, ipniIndexer string) *Ch
 	}
 }
 
+const (
+	maxRetries = 2
+	retryDelay = 5 * time.Second
+)
+
+// errRetryable is returned by doCheck when the ipfs-check backend returns a
+// 200 response that indicates the DHT has no provider records yet. The
+// backend can return an instant "no records" result due to DHT eventual
+// consistency, but a retry after a few seconds succeeds.
+var errRetryable = fmt.Errorf("retryable: no providers found")
+
 func (c *CheckClient) Check(ctx context.Context, backend string, domain string, timeout time.Duration) (*CheckResponse, error) {
 	u, err := url.Parse(backend)
 	if err != nil {
@@ -55,6 +67,56 @@ func (c *CheckClient) Check(ctx context.Context, backend string, domain string, 
 	u.RawQuery = q.Encode()
 	checkURL := u.String()
 
+	var resp *CheckResponse
+	err = retry.New(
+		retry.Attempts(maxRetries+1),
+		retry.Delay(retryDelay),
+		retry.DelayType(retry.FixedDelay),
+		retry.RetryIf(func(err error) bool {
+			return err == errRetryable
+		}),
+		retry.OnRetry(func(n uint, err error) {
+			zap.L().Warn("check retrying",
+				zap.String("domain", domain),
+				zap.String("backend", backend),
+				zap.Uint("attempt", n+1),
+				zap.Error(err),
+			)
+		}),
+		retry.LastErrorOnly(true),
+		retry.Context(ctx),
+	).Do(func() error {
+		r, err := c.doCheck(ctx, checkURL, backend, domain, timeout)
+		if err != nil {
+			return err
+		}
+		if c.isRetryableResponse(r) {
+			return errRetryable
+		}
+		resp = r
+		return nil
+	})
+	if resp != nil {
+		return resp, nil
+	}
+	return nil, err
+}
+
+// isRetryableResponse returns true if the response is a 200 but indicates
+// the DHT has no provider records yet.
+func (c *CheckClient) isRetryableResponse(resp *CheckResponse) bool {
+	// DNSLink resolution failed
+	if resp.MutableResolution != nil && resp.MutableResolution.Error != "" {
+		return true
+	}
+	// No providers found at all
+	if len(resp.Providers) == 0 {
+		return true
+	}
+	return false
+}
+
+func (c *CheckClient) doCheck(ctx context.Context, checkURL, backend, domain string, timeout time.Duration) (*CheckResponse, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, checkURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("creating request: %w", err)

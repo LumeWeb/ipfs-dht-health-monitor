@@ -5,6 +5,7 @@ go 1.26.0
 require github.com/urfave/cli/v3 v3.6.1
 
 require (
+	github.com/avast/retry-go/v5 v5.0.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
