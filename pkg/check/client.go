@@ -43,7 +43,10 @@ func NewClient(backends []string, timeout time.Duration, ipniIndexer string) *Ch
 }
 
 const (
-	maxRetries = 2
+	// maxRetries is kept at 1 (2 total attempts) to retry once for DHT
+	// eventual consistency without adding excessive delay for domains
+	// that legitimately have no provider records.
+	maxRetries = 1
 	retryDelay = 5 * time.Second
 )
 
@@ -90,13 +93,18 @@ func (c *CheckClient) Check(ctx context.Context, backend string, domain string, 
 		if err != nil {
 			return err
 		}
+		// Capture the response before the retryable check so we can return
+		// it even when retries are exhausted on a valid 200 with no providers.
+		resp = r
 		if c.isRetryableResponse(r) {
 			return errRetryable
 		}
-		resp = r
 		return nil
 	})
-	if resp != nil {
+	// Return the last valid response even when retries were exhausted on a
+	// retryable-but-valid (200, no providers) answer; reserve the error path
+	// for actual failures (network errors, non-200, decode errors).
+	if resp != nil && (err == nil || err == errRetryable) {
 		return resp, nil
 	}
 	return nil, err

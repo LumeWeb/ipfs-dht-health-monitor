@@ -167,7 +167,9 @@ func TestClient_Check_RetryOnEmptyProviders(t *testing.T) {
 func TestClient_Check_RetryExhausted(t *testing.T) {
 	t.Parallel()
 
+	var callCount atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		callCount.Add(1)
 		// Always return empty providers (retryable, but retries exhausted)
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(CheckResponse{
@@ -181,8 +183,20 @@ func TestClient_Check_RetryExhausted(t *testing.T) {
 	defer srv.Close()
 
 	client := NewClient([]string{srv.URL}, 30*time.Second, "https://cid.contact")
-	_, err := client.Check(t.Context(), srv.URL, "example.com", 10*time.Second)
-	if err == nil {
-		t.Fatal("Check() expected error after retries exhausted, got nil")
+	got, err := client.Check(t.Context(), srv.URL, "example.com", 10*time.Second)
+	// After retries exhausted on a valid 200 with no providers, the response
+	// should still be returned (not an error) so metrics reflect the real
+	// state instead of marking the backend as down.
+	if err != nil {
+		t.Fatalf("Check() unexpected error after retries exhausted: %v", err)
+	}
+	if calls := callCount.Load(); calls != 2 {
+		t.Errorf("expected 2 attempts (1 retry), got %d", calls)
+	}
+	if got == nil {
+		t.Fatal("Check() returned nil response after retries exhausted")
+	}
+	if len(got.Providers) != 0 {
+		t.Errorf("len(Providers) = %d, want 0", len(got.Providers))
 	}
 }
