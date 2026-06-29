@@ -55,7 +55,7 @@ func TestScheduler_RunCheckCycle(t *testing.T) {
 	defer srv.Close()
 
 	m := newTestMetricsForScheduler(t)
-	client := check.NewClient([]string{srv.URL}, 10*time.Second)
+	client := check.NewClient([]string{srv.URL}, 10*time.Second, "https://cid.contact")
 	s := NewScheduler(client, m, []string{"example.com"}, []string{srv.URL}, 10*time.Second, 10*time.Second)
 
 	ctx := t.Context()
@@ -83,7 +83,7 @@ func TestScheduler_SkipOverlapping(t *testing.T) {
 	defer srv.Close()
 
 	m := newTestMetricsForScheduler(t)
-	client := check.NewClient([]string{srv.URL}, 10*time.Second)
+	client := check.NewClient([]string{srv.URL}, 10*time.Second, "https://cid.contact")
 	s := NewScheduler(client, m, []string{"example.com"}, []string{srv.URL}, 100*time.Millisecond, 10*time.Second)
 
 	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
