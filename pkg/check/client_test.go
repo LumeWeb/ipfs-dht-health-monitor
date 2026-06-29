@@ -43,8 +43,15 @@ func TestClient_Check_Success(t *testing.T) {
 
 	resp := validCheckResponse()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if got := r.URL.Query().Get("cid"); got != "example.com" {
-			t.Errorf("expected cid=example.com, got %q", got)
+		q := r.URL.Query()
+		if got := q.Get("cid"); got != "/ipns/example.com" {
+			t.Errorf("expected cid=/ipns/example.com, got %q", got)
+		}
+		if got := q.Get("httpRetrieval"); got != "on" {
+			t.Errorf("expected httpRetrieval=on, got %q", got)
+		}
+		if got := q.Get("ipniIndexer"); got != "https://cid.contact" {
+			t.Errorf("expected ipniIndexer=https://cid.contact, got %q", got)
 		}
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(resp); err != nil {
@@ -53,7 +60,7 @@ func TestClient_Check_Success(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client := NewClient([]string{srv.URL}, 30*time.Second)
+	client := NewClient([]string{srv.URL}, 30*time.Second, "https://cid.contact")
 	got, err := client.Check(t.Context(), srv.URL, "example.com", 10*time.Second)
 	if err != nil {
 		t.Fatalf("Check() error: %v", err)
@@ -88,7 +95,7 @@ func TestClient_Check_Error(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client := NewClient([]string{srv.URL}, 30*time.Second)
+	client := NewClient([]string{srv.URL}, 30*time.Second, "https://cid.contact")
 	_, err := client.Check(t.Context(), srv.URL, "example.com", 10*time.Second)
 	if err == nil {
 		t.Fatal("Check() expected error, got nil")
@@ -104,7 +111,7 @@ func TestClient_Check_Timeout(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client := NewClient([]string{srv.URL}, 30*time.Second)
+	client := NewClient([]string{srv.URL}, 30*time.Second, "https://cid.contact")
 	ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
 	defer cancel()
 

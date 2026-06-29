@@ -56,7 +56,7 @@ func TestServer_MetricsEndpoint(t *testing.T) {
 	defer backendSrv.Close()
 
 	m := newTestMetricsForServer(t)
-	client := check.NewClient([]string{backendSrv.URL}, 10*time.Second)
+	client := check.NewClient([]string{backendSrv.URL}, 10*time.Second, "https://cid.contact")
 	sched := scheduler.NewScheduler(client, m, []string{"example.com"}, []string{backendSrv.URL}, 10*time.Second, 10*time.Second)
 
 	srv := NewServer("127.0.0.1:0", m, sched)

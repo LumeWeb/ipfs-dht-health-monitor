@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"time"
 
 	"go.lumeweb.com/ipfs-dht-health-monitor/build"
@@ -21,25 +22,38 @@ type Checker interface {
 }
 
 type CheckClient struct {
-	httpClient *http.Client
-	backends   []string
-	userAgent  string
+	httpClient  *http.Client
+	backends    []string
+	ipniIndexer string
+	userAgent   string
 }
 
 var _ Checker = (*CheckClient)(nil)
 
-func NewClient(backends []string, timeout time.Duration) *CheckClient {
+func NewClient(backends []string, timeout time.Duration, ipniIndexer string) *CheckClient {
 	return &CheckClient{
 		httpClient: &http.Client{
 			Timeout: timeout,
 		},
-		backends:  backends,
-		userAgent: fmt.Sprintf("ipfs-dht-health-monitor/%s", build.Version),
+		backends:    backends,
+		ipniIndexer: ipniIndexer,
+		userAgent:   fmt.Sprintf("ipfs-dht-health-monitor/%s", build.Version),
 	}
 }
 
 func (c *CheckClient) Check(ctx context.Context, backend string, domain string, timeout time.Duration) (*CheckResponse, error) {
-	checkURL := fmt.Sprintf("%s/check?cid=%s&timeoutSeconds=%d", backend, url.QueryEscape(domain), int(timeout.Seconds()))
+	u, err := url.Parse(backend)
+	if err != nil {
+		return nil, fmt.Errorf("parsing backend URL: %w", err)
+	}
+	u.Path = u.Path + "/check"
+	q := u.Query()
+	q.Set("cid", "/ipns/"+domain)
+	q.Set("timeoutSeconds", strconv.Itoa(int(timeout.Seconds())))
+	q.Set("ipniIndexer", c.ipniIndexer)
+	q.Set("httpRetrieval", "on")
+	u.RawQuery = q.Encode()
+	checkURL := u.String()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, checkURL, nil)
 	if err != nil {

@@ -11,12 +11,13 @@ import (
 )
 
 type Config struct {
-	Domains  []string
-	Backends []string
-	Interval time.Duration
-	Port     int
-	Listen   string
-	Timeout  time.Duration
+	Domains     []string
+	Backends    []string
+	Interval    time.Duration
+	Port        int
+	Listen      string
+	Timeout     time.Duration
+	IPNIIndexer string
 }
 
 func configFromCLI(cmd *cli.Command) (*Config, error) {
@@ -42,6 +43,10 @@ func configFromCLI(cmd *cli.Command) (*Config, error) {
 	cfg.Port = cmd.Int(FlagPort)
 	cfg.Listen = cmd.String(FlagListen)
 	cfg.Timeout = cmd.Duration(FlagTimeout)
+	cfg.IPNIIndexer = cmd.String(FlagIPNIIndexer)
+	if cfg.IPNIIndexer == "" {
+		return nil, fmt.Errorf("--ipni-indexer must not be empty")
+	}
 
 	return cfg, nil
 }

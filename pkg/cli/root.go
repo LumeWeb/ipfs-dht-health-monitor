@@ -13,17 +13,18 @@ import (
 	"go.lumeweb.com/ipfs-dht-health-monitor/pkg/scheduler"
 	"go.lumeweb.com/ipfs-dht-health-monitor/pkg/server"
 
-	"go.uber.org/zap"
 	"github.com/urfave/cli/v3"
+	"go.uber.org/zap"
 )
 
 const (
-	FlagDomains  = "domains"
-	FlagBackends = "backends"
-	FlagInterval = "interval"
-	FlagPort     = "port"
-	FlagListen   = "listen"
-	FlagTimeout  = "timeout"
+	FlagDomains     = "domains"
+	FlagBackends    = "backends"
+	FlagInterval    = "interval"
+	FlagPort        = "port"
+	FlagListen      = "listen"
+	FlagTimeout     = "timeout"
+	FlagIPNIIndexer = "ipni-indexer"
 )
 
 func Run(ctx context.Context, args []string) error {
@@ -73,6 +74,12 @@ func NewRootCommand() *cli.Command {
 				Value:   30 * time.Second,
 				Sources: cli.EnvVars("IPFS_CHECK_TIMEOUT"),
 			},
+			&cli.StringFlag{
+				Name:    FlagIPNIIndexer,
+				Usage:   "IPNI indexer URL for provider discovery",
+				Value:   "https://cid.contact",
+				Sources: cli.EnvVars("IPFS_CHECK_IPNI_INDEXER"),
+			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			cfg, err := configFromCLI(cmd)
@@ -80,7 +87,7 @@ func NewRootCommand() *cli.Command {
 				return err
 			}
 
-			client := check.NewClient(cfg.Backends, cfg.Timeout)
+			client := check.NewClient(cfg.Backends, cfg.Timeout, cfg.IPNIIndexer)
 			m := metrics.NewMetrics()
 			sched := scheduler.NewScheduler(client, m, cfg.Domains, cfg.Backends, cfg.Interval, cfg.Timeout)
 			srv := server.NewServer(cfg.ListenAddr(), m, sched)
