@@ -9,8 +9,8 @@ import (
 	"go.lumeweb.com/ipfs-dht-health-monitor/pkg/metrics"
 	"go.lumeweb.com/ipfs-dht-health-monitor/pkg/scheduler"
 
-	"go.uber.org/zap"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.uber.org/zap"
 )
 
 type Server struct {

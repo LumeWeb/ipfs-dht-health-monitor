@@ -28,12 +28,6 @@ func validCheckResponse() CheckResponse {
 					Found:     true,
 					Responded: true,
 				},
-				DataAvailableOverHTTP: HTTPCheckOutput{
-					Enabled:   true,
-					Duration:  Duration(200 * time.Millisecond),
-					Found:     true,
-					Connected: true,
-				},
 			},
 		},
 	}
@@ -47,9 +41,6 @@ func TestClient_Check_Success(t *testing.T) {
 		q := r.URL.Query()
 		if got := q.Get("cid"); got != "/ipns/example.com" {
 			t.Errorf("expected cid=/ipns/example.com, got %q", got)
-		}
-		if got := q.Get("httpRetrieval"); got != "on" {
-			t.Errorf("expected httpRetrieval=on, got %q", got)
 		}
 		if got := q.Get("ipniIndexer"); got != "https://cid.contact" {
 			t.Errorf("expected ipniIndexer=https://cid.contact, got %q", got)
@@ -81,9 +72,6 @@ func TestClient_Check_Success(t *testing.T) {
 	}
 	if !got.Providers[0].DataAvailableOverBitswap.Found {
 		t.Error("Bitswap.Found = false, want true")
-	}
-	if !got.Providers[0].DataAvailableOverHTTP.Found {
-		t.Error("HTTP.Found = false, want true")
 	}
 }
 

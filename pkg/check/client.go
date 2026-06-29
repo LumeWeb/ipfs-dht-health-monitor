@@ -66,7 +66,6 @@ func (c *CheckClient) Check(ctx context.Context, backend string, domain string, 
 	q.Set("cid", "/ipns/"+domain)
 	q.Set("timeoutSeconds", strconv.Itoa(int(timeout.Seconds())))
 	q.Set("ipniIndexer", c.ipniIndexer)
-	q.Set("httpRetrieval", "on")
 	u.RawQuery = q.Encode()
 	checkURL := u.String()
 
