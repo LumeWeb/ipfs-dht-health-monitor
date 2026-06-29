@@ -12,7 +12,6 @@ const (
 	CheckTypeDNSLinkResolution = "DNSLinkResolution"
 	CheckTypeProviderDiscovery = "ProviderDiscovery"
 	CheckTypeBitswapRetrieval  = "BitswapRetrieval"
-	CheckTypeHTTPRetrieval     = "HTTPRetrieval"
 )
 
 const (

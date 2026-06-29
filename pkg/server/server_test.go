@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"go.lumeweb.com/ipfs-dht-health-monitor/pkg/internal/testutil"
 	"go.lumeweb.com/ipfs-dht-health-monitor/pkg/check"
+	"go.lumeweb.com/ipfs-dht-health-monitor/pkg/internal/testutil"
 	"go.lumeweb.com/ipfs-dht-health-monitor/pkg/metrics"
 	"go.lumeweb.com/ipfs-dht-health-monitor/pkg/scheduler"
 )
@@ -39,11 +39,6 @@ func TestServer_MetricsEndpoint(t *testing.T) {
 					Duration:  check.Duration(100 * time.Millisecond),
 					Found:     true,
 					Responded: true,
-				},
-				DataAvailableOverHTTP: check.HTTPCheckOutput{
-					Enabled:  true,
-					Duration: check.Duration(50 * time.Millisecond),
-					Found:    true,
 				},
 			},
 		},

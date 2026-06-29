@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"go.lumeweb.com/ipfs-dht-health-monitor/pkg/internal/testutil"
 	"go.lumeweb.com/ipfs-dht-health-monitor/pkg/check"
+	"go.lumeweb.com/ipfs-dht-health-monitor/pkg/internal/testutil"
 	"go.lumeweb.com/ipfs-dht-health-monitor/pkg/metrics"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -38,11 +38,6 @@ func TestScheduler_RunCheckCycle(t *testing.T) {
 					Duration:  check.Duration(100 * time.Millisecond),
 					Found:     true,
 					Responded: true,
-				},
-				DataAvailableOverHTTP: check.HTTPCheckOutput{
-					Enabled:  true,
-					Duration: check.Duration(50 * time.Millisecond),
-					Found:    true,
 				},
 			},
 		},

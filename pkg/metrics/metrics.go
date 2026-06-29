@@ -3,28 +3,26 @@ package metrics
 import (
 	"time"
 
-	"go.lumeweb.com/ipfs-dht-health-monitor/pkg/check"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
+	"go.lumeweb.com/ipfs-dht-health-monitor/pkg/check"
 )
 
 const namespace = "ipfs_check"
 
 const (
-	MetricDNSLinkResolutionSuccess     = "dnslink_resolution_success"
-	MetricProvidersFoundTotal          = "providers_found_total"
-	MetricProvidersWithAddressesTotal  = "providers_with_addresses_total"
-	MetricBitswapSuccess               = "bitswap_success"
-	MetricBitswapDurationSeconds       = "bitswap_duration_seconds"
-	MetricBitswapProvidersResponded   = "bitswap_providers_responded"
-	MetricBitswapProvidersWithData    = "bitswap_providers_with_data"
-	MetricHTTPRetrievalSuccess        = "http_retrieval_success"
-	MetricHTTPRetrievalDurationSeconds = "http_retrieval_duration_seconds"
-	MetricBackendUp                   = "backend_up"
+	MetricDNSLinkResolutionSuccess       = "dnslink_resolution_success"
+	MetricProvidersFoundTotal            = "providers_found_total"
+	MetricProvidersWithAddressesTotal    = "providers_with_addresses_total"
+	MetricBitswapSuccess                 = "bitswap_success"
+	MetricBitswapDurationSeconds         = "bitswap_duration_seconds"
+	MetricBitswapProvidersResponded      = "bitswap_providers_responded"
+	MetricBitswapProvidersWithData       = "bitswap_providers_with_data"
+	MetricBackendUp                      = "backend_up"
 	MetricBackendResponseDurationSeconds = "backend_response_duration_seconds"
-	MetricScrapesTotal                = "scrapes_total"
-	MetricScrapeErrorsTotal           = "scrape_errors_total"
-	MetricLastScrapeTimestampSeconds  = "last_scrape_timestamp_seconds"
+	MetricScrapesTotal                   = "scrapes_total"
+	MetricScrapeErrorsTotal              = "scrape_errors_total"
+	MetricLastScrapeTimestampSeconds     = "last_scrape_timestamp_seconds"
 )
 
 type Metrics interface {
@@ -39,8 +37,8 @@ type Metrics interface {
 
 type MetricsDefault struct {
 	gaugeVecs   map[string]*prometheus.GaugeVec
-	counters     map[string]prometheus.Counter
-	counterVecs  map[string]*prometheus.CounterVec
+	counters    map[string]prometheus.Counter
+	counterVecs map[string]*prometheus.CounterVec
 }
 
 type gaugeDef struct {
@@ -60,8 +58,6 @@ func NewMetrics() Metrics {
 		{MetricBitswapDurationSeconds, "Maximum bitswap retrieval duration across providers in seconds", domainBackend},
 		{MetricBitswapProvidersResponded, "Number of providers that responded to bitswap check", domainBackend},
 		{MetricBitswapProvidersWithData, "Number of providers that had data available over bitswap", domainBackend},
-		{MetricHTTPRetrievalSuccess, "Whether HTTP retrieval succeeded for any provider (1=success, 0=failure)", domainBackend},
-		{MetricHTTPRetrievalDurationSeconds, "Maximum HTTP retrieval duration across providers in seconds", domainBackend},
 		{MetricBackendUp, "Whether the backend is reachable (1=up, 0=down)", []string{"backend"}},
 		{MetricBackendResponseDurationSeconds, "Duration of backend response in seconds", []string{"backend"}},
 		{MetricLastScrapeTimestampSeconds, "Unix timestamp of the last scrape", domainBackend},
@@ -133,8 +129,6 @@ func (m *MetricsDefault) UpdateFromCheckResponse(domain, backend string, resp *c
 	maxBitswapDur := time.Duration(0)
 	bitswapResponded := 0
 	bitswapWithData := 0
-	httpFound := false
-	maxHTTPDur := time.Duration(0)
 
 	for _, p := range resp.Providers {
 		sourceCounts[p.Source]++
@@ -154,13 +148,6 @@ func (m *MetricsDefault) UpdateFromCheckResponse(domain, backend string, resp *c
 		if p.DataAvailableOverBitswap.Found {
 			bitswapWithData++
 		}
-
-		if p.DataAvailableOverHTTP.Found {
-			httpFound = true
-		}
-		if time.Duration(p.DataAvailableOverHTTP.Duration) > maxHTTPDur {
-			maxHTTPDur = time.Duration(p.DataAvailableOverHTTP.Duration)
-		}
 	}
 
 	m.g(MetricProvidersFoundTotal).DeletePartialMatch(prometheus.Labels{"domain": domain, "backend": backend})
@@ -177,13 +164,6 @@ func (m *MetricsDefault) UpdateFromCheckResponse(domain, backend string, resp *c
 	m.g(MetricBitswapDurationSeconds).WithLabelValues(domain, backend).Set(maxBitswapDur.Seconds())
 	m.g(MetricBitswapProvidersResponded).WithLabelValues(domain, backend).Set(float64(bitswapResponded))
 	m.g(MetricBitswapProvidersWithData).WithLabelValues(domain, backend).Set(float64(bitswapWithData))
-
-	if httpFound {
-		m.g(MetricHTTPRetrievalSuccess).WithLabelValues(domain, backend).Set(1)
-	} else {
-		m.g(MetricHTTPRetrievalSuccess).WithLabelValues(domain, backend).Set(0)
-	}
-	m.g(MetricHTTPRetrievalDurationSeconds).WithLabelValues(domain, backend).Set(maxHTTPDur.Seconds())
 }
 
 func (m *MetricsDefault) zeroProviderMetrics(domain, backend string) {
@@ -196,8 +176,6 @@ func (m *MetricsDefault) zeroProviderMetrics(domain, backend string) {
 	m.g(MetricBitswapDurationSeconds).WithLabelValues(domain, backend).Set(0)
 	m.g(MetricBitswapProvidersResponded).WithLabelValues(domain, backend).Set(0)
 	m.g(MetricBitswapProvidersWithData).WithLabelValues(domain, backend).Set(0)
-	m.g(MetricHTTPRetrievalSuccess).WithLabelValues(domain, backend).Set(0)
-	m.g(MetricHTTPRetrievalDurationSeconds).WithLabelValues(domain, backend).Set(0)
 }
 
 func (m *MetricsDefault) ZeroDomainMetrics(domain, backend string) {

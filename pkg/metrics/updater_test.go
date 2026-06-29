@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"go.lumeweb.com/ipfs-dht-health-monitor/pkg/internal/testutil"
 	"go.lumeweb.com/ipfs-dht-health-monitor/pkg/check"
+	"go.lumeweb.com/ipfs-dht-health-monitor/pkg/internal/testutil"
 
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
@@ -49,12 +49,6 @@ func TestUpdateFromCheckResponse_Success(t *testing.T) {
 					Found:     true,
 					Responded: true,
 				},
-				DataAvailableOverHTTP: check.HTTPCheckOutput{
-					Enabled:   true,
-					Duration:  check.Duration(200 * time.Millisecond),
-					Found:     true,
-					Connected: true,
-				},
 			},
 		},
 	}
@@ -75,9 +69,6 @@ func TestUpdateFromCheckResponse_Success(t *testing.T) {
 	}
 	if v := readGauge(m.g(MetricBitswapSuccess), "example.com", "backend1"); v != 1 {
 		t.Errorf("bitswap_success = %v, want 1", v)
-	}
-	if v := readGauge(m.g(MetricHTTPRetrievalSuccess), "example.com", "backend1"); v != 1 {
-		t.Errorf("http_retrieval_success = %v, want 1", v)
 	}
 	if v := readGauge(m.g(MetricBitswapProvidersResponded), "example.com", "backend1"); v != 1 {
 		t.Errorf("bitswap_providers_responded = %v, want 1", v)
@@ -123,11 +114,6 @@ func TestZeroDomainMetrics(t *testing.T) {
 					Found:     true,
 					Responded: true,
 				},
-				DataAvailableOverHTTP: check.HTTPCheckOutput{
-					Enabled:  true,
-					Duration: check.Duration(200 * time.Millisecond),
-					Found:    true,
-				},
 			},
 		},
 	}
@@ -141,14 +127,8 @@ func TestZeroDomainMetrics(t *testing.T) {
 	if v := readGauge(m.g(MetricBitswapSuccess), "example.com", "backend1"); v != 0 {
 		t.Errorf("bitswap_success after zero = %v, want 0", v)
 	}
-	if v := readGauge(m.g(MetricHTTPRetrievalSuccess), "example.com", "backend1"); v != 0 {
-		t.Errorf("http_retrieval_success after zero = %v, want 0", v)
-	}
 	if v := readGauge(m.g(MetricBitswapDurationSeconds), "example.com", "backend1"); v != 0 {
 		t.Errorf("bitswap_duration after zero = %v, want 0", v)
-	}
-	if v := readGauge(m.g(MetricHTTPRetrievalDurationSeconds), "example.com", "backend1"); v != 0 {
-		t.Errorf("http_retrieval_duration after zero = %v, want 0", v)
 	}
 }
 
